@@ -324,6 +324,10 @@
               <div class="field"><label for="bizName">Nama usaha</label><input id="bizName" data-bind="business.name" type="text"></div>
               <div class="field"><label for="bizPhoneAdmin">WhatsApp Business admin</label><input id="bizPhoneAdmin" data-bind="business.phone" type="text" placeholder="62812xxxxxxxx"></div>
             </div>
+            <div class="field" style="margin-top:12px">
+              <label for="bizTagline">Tagline / slogan (opsional, tampil di pesan WhatsApp)</label>
+              <input id="bizTagline" data-bind="business.tagline" type="text" placeholder="mis. From the river we begin">
+            </div>
             <div class="grid-2" style="margin-top:12px">
               <div class="field"><label for="bizAddress">Alamat</label><input id="bizAddress" data-bind="business.address" type="text"></div>
               <div class="field"><label for="bizNpwp">NPWP</label><input id="bizNpwp" data-bind="business.npwp" type="text" class="mono"></div>
@@ -520,6 +524,7 @@
   function defaultBusiness(){
     return {
       name:'Green Forest Riverside',
+      tagline:'From the river we begin🚣‍♀️⛺🌲',
       phone:'6282233332919',
       address:'Pulosari, Kecamatan Pangalengan, Kabupaten Bandung, Jawa Barat',
       npwp:'416329753429000',
@@ -685,14 +690,24 @@
   /* ---------------- invoice text ---------------- */
   function buildInvoiceText(totals){
     var lines = [];
-    lines.push('*INVOICE*');
-    lines.push('No. Faktur      : ' + state.invoiceNo);
-    lines.push('Tanggal Terbit  : ' + longDateID(state.issueDate.getFullYear()+'-'+pad(state.issueDate.getMonth()+1)+'-'+pad(state.issueDate.getDate())));
+    lines.push('*' + state.business.name + '*');
+    if(state.business.tagline){
+      lines.push('-' + state.business.tagline + '-');
+    }
     lines.push('');
-    lines.push('*Kepada*          : ' + (state.customer.name || '-'));
-    lines.push('*Unit*            : ' + (state.activity.group || '-'));
-    lines.push('*Check-in*        : ' + longDateID(state.activity.checkin));
-    lines.push('*Check-out*       : ' + longDateID(state.activity.checkout));
+    lines.push(state.business.address || '-');
+    lines.push('+' + state.business.phone);
+    lines.push('');
+    lines.push('===========');
+    lines.push('');
+    lines.push('*INVOICE*');
+    lines.push('No. Faktur : ' + state.invoiceNo);
+    lines.push('Tanggal Terbit : ' + longDateID(state.issueDate.getFullYear()+'-'+pad(state.issueDate.getMonth()+1)+'-'+pad(state.issueDate.getDate())));
+    lines.push('');
+    lines.push('*Kepada* : ' + (state.customer.name || '-'));
+    lines.push('*Unit* : ' + (state.activity.group || '-'));
+    lines.push('*Check-in* : ' + longDateID(state.activity.checkin));
+    lines.push('*Check-out* : ' + longDateID(state.activity.checkout));
     lines.push('');
     lines.push('*RINCIAN*');
     state.items.forEach(function(it, idx){
@@ -700,15 +715,15 @@
       lines.push('   ' + it.qty + ' x ' + fmtRp(it.price) + ' = ' + fmtRp(it.qty*it.price));
     });
     lines.push('');
-    lines.push(padLabel('Subtotal') + ': ' + fmtRp(totals.subtotal));
+    lines.push('Subtotal : ' + fmtRp(totals.subtotal));
     if(state.discount.enabled && totals.discountAmt > 0){
-      lines.push(padLabel(state.discount.label || 'Diskon') + ': -' + fmtRp(totals.discountAmt));
+      lines.push((state.discount.label || 'Diskon') + ' : -' + fmtRp(totals.discountAmt));
     }
     if((state.dp||0) > 0){
-      lines.push(padLabel('DP (' + longDateID(state.dpDate) + ')') + ': -' + fmtRp(state.dp));
+      lines.push('DP (' + longDateID(state.dpDate) + ') : -' + fmtRp(state.dp));
     }
     state.otherPayments.forEach(function(p){
-      lines.push(padLabel(p.label || 'Pembayaran') + ': -' + fmtRp(p.amount));
+      lines.push((p.label || 'Pembayaran') + ' : -' + fmtRp(p.amount));
     });
     lines.push('-------------------------------');
     if(totals.overpaid){
@@ -729,14 +744,7 @@
     lines.push('Mohon dilunasi ' + state.business.dueNote + '.');
     lines.push('');
     lines.push('Catatan: DP tidak dapat dikembalikan. Perubahan jadwal dapat diajukan ke admin.');
-    lines.push('');
-    lines.push('Terima kasih sudah memilih ' + state.business.name + '. Sampai jumpa di lokasi! 🏕️');
     return lines.join('\n');
-  }
-  function padLabel(s){
-    s = String(s);
-    if(s.length >= 16) return s + ' ';
-    return s + Array(16 - s.length + 1).join(' ');
   }
 
   function textToHtml(text){
