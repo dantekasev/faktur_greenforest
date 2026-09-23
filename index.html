@@ -1,3 +1,8 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
 <title>Faktur Green Forest Riverside</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
@@ -273,7 +278,22 @@
 
   .foot-note{margin-top:6px; font-size:.78rem; color:var(--ink-faint); text-align:center; padding:0 8px}
   .foot-note a{color:var(--ink-dim)}
+
+  @media (max-width:640px){
+    body{font-size:15px}
+    .app{padding:14px 12px 28px}
+    .panel{padding:16px}
+    .btn{padding:12px 14px; min-height:44px; font-size:.86rem}
+    .field input, .field select, .field textarea{padding:11px 10px; min-height:44px; font-size:1rem}
+    .add-item-row select{padding:11px 10px; min-height:44px}
+    .checkline{padding:6px 0}
+    .checkline input{width:20px; height:20px}
+    .item-row .col-name input{padding:8px 0; font-size:1rem}
+    .actions{gap:8px}
+  }
 </style>
+</head>
+<body>
 
 <div class="app">
   <header class="topbar">
@@ -433,13 +453,14 @@
           <div class="wa-bubble" id="waBubble"></div>
         </div>
         <div class="actions">
-          <a class="btn btn-primary" id="btnSendWa" href="#" target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M20 4L3 11l6 2.5L18 6l-7.5 8.5L14 20l6-16z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-            Kirim ke WhatsApp
-          </a>
+          <button class="btn btn-primary" id="btnSharePdf" type="button">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M18 8a3 3 0 100-6 3 3 0 000 6zM6 15a3 3 0 100-6 3 3 0 000 6zM18 22a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.8"/><path d="M8.6 13.5l6.8-3.9M8.6 10.5l6.8 3.9" stroke="currentColor" stroke-width="1.8"/></svg>
+            Bagikan PDF
+          </button>
           <button class="btn" id="btnCopyText" type="button">Salin teks</button>
           <button class="btn btn-amber" id="btnPdf" type="button">Unduh PDF</button>
         </div>
+        <p class="foot-note" style="margin-top:10px; text-align:left">Di HP, "Bagikan PDF" membuka menu share bawaan — tinggal pilih Drive untuk menyimpan, atau WhatsApp untuk langsung melampirkan PDF ke chat customer. Pakai "Salin teks" untuk menyalin teks fakturnya ke chat yang sama. Di komputer, PDF akan diunduh biasa.</p>
       </section>
 
       <p class="foot-note">Prototipe demonstrasi berdasarkan PRD. Tidak ada data pesanan atau customer yang disimpan di server — semua hitungan berjalan di perangkat Anda.</p>
@@ -863,17 +884,6 @@
     var raw = buildInvoiceText(totals);
     lastRawText = raw;
     document.getElementById('waBubble').innerHTML = textToHtml(raw);
-
-    var sendBtn = document.getElementById('btnSendWa');
-    var phone = normalizePhone(state.customer.phone);
-    var canSend = phone && state.items.length && totals.totalTagihan > 0 && (state.dp||0) >= MIN_DP;
-    if(canSend){
-      sendBtn.href = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(raw);
-      sendBtn.removeAttribute('aria-disabled');
-    } else {
-      sendBtn.href = '#';
-      sendBtn.setAttribute('aria-disabled','true');
-    }
   }
 
   function renderAll(){
@@ -994,18 +1004,8 @@
       downloadPdf();
     });
 
-    document.getElementById('btnSendWa').addEventListener('click', function(e){
-      if(this.getAttribute('aria-disabled') !== 'true') return;
-      e.preventDefault();
-      if(!state.items.length){
-        showToast('Belum ada item pada pesanan.');
-      } else if(!normalizePhone(state.customer.phone)){
-        showToast('Nomor WhatsApp customer belum valid (contoh: 0812xxxxxxxx).');
-      } else if((state.dp||0) < MIN_DP){
-        showToast('DP minimal ' + fmtRp(MIN_DP) + ' sebelum bisa dikirim.');
-      } else {
-        showToast('Faktur belum bisa dikirim, cek isian di atas.');
-      }
+    document.getElementById('btnSharePdf').addEventListener('click', function(){
+      sharePdf();
     });
   }
 
@@ -1221,18 +1221,30 @@
     }
   }
 
-  function downloadPdf(){
-    if(!window.jspdf){ showToast('Pustaka PDF gagal dimuat'); return; }
+  function buildInvoicePdfDoc(){
+    if(!window.jspdf) return null;
     var totals = computeTotals();
     var doc = new window.jspdf.jsPDF({unit:'mm', format:'a4'});
-
     drawInvoicePage(doc, PDF_LABELS.id, false, totals);
     doc.addPage();
     drawInvoicePage(doc, PDF_LABELS.en, true, totals);
+    return doc;
+  }
 
-    var blob = doc.output('blob');
-    var filename = 'Faktur-' + (state.customer.name||'Customer').replace(/[^a-z0-9]+/gi,'-') + '-' + state.invoiceNo.replace('/','-') + '.pdf';
+  function invoicePdfFilename(){
+    var namePart = (state.customer.name||'Customer').trim().replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'');
+    if(!namePart) namePart = 'Customer';
+    var invoicePart = (state.invoiceNo||'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+    return 'Faktur-' + namePart + '-' + invoicePart + '.pdf';
+  }
 
+  function downloadPdf(){
+    var doc = buildInvoicePdfDoc();
+    if(!doc){ showToast('Pustaka PDF gagal dimuat'); return; }
+    downloadPdfBlob(doc.output('blob'), invoicePdfFilename());
+  }
+
+  function downloadPdfBlob(blob, filename){
     if(window.claude && window.claude.use){
       window.claude.use('downloads').then(function(dl){
         if(!dl){ pdfFallback(blob, filename); return; }
@@ -1254,6 +1266,42 @@
       window.open(url, '_blank');
       showToast('PDF dibuka di tab baru');
     }catch(e){ showToast('Tidak dapat membuat PDF di tampilan ini'); }
+  }
+
+  /* ---------------- Bagikan PDF (native share sheet) ---------------- */
+  // Pakai Web Share API bawaan HP: sekali tap, admin bisa pilih langsung
+  // "Drive", "WhatsApp", "Save to Files", dsb dari menu share asli HP-nya.
+  // Tidak perlu akun/API/Client ID apa pun. Di desktop (yang umumnya tidak
+  // mendukung share file), otomatis jatuh ke unduh biasa.
+  function sharePdf(){
+    if(!state.items.length){ showToast('Belum ada item pada pesanan.'); return; }
+    var doc = buildInvoicePdfDoc();
+    if(!doc){ showToast('Pustaka PDF gagal dimuat'); return; }
+    var blob = doc.output('blob');
+    var filename = invoicePdfFilename();
+
+    var canNativeShare = false;
+    var file = null;
+    try{
+      if(window.navigator && navigator.share && navigator.canShare){
+        file = new File([blob], filename, {type:'application/pdf'});
+        canNativeShare = navigator.canShare({files:[file]});
+      }
+    }catch(e){ canNativeShare = false; }
+
+    if(canNativeShare){
+      navigator.share({
+        files: [file],
+        title: filename
+      }).then(function(){
+        showToast('PDF dikirim');
+      }).catch(function(err){
+        if(err && err.name === 'AbortError') return;
+        downloadPdfBlob(blob, filename);
+      });
+    } else {
+      downloadPdfBlob(blob, filename);
+    }
   }
 
   /* ---------------- init ---------------- */
@@ -1279,3 +1327,5 @@
   }
 })();
 </script>
+</body>
+</html>
